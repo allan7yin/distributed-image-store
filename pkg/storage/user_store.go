@@ -17,17 +17,13 @@ func NewUserStore(db *gorm.DB) *UserStore {
 
 // AddUser adds a user to the database
 func (s *UserStore) AddUser(user entities.User) error {
-	// Start a new transaction
 	tx := s.db.Begin()
 
-	// Directly use the User entity (no mapper needed)
 	if err := tx.Create(&user).Error; err != nil {
-		// Rollback transaction if there's an error
 		tx.Rollback()
 		return err
 	}
 
-	// Commit the transaction
 	if err := tx.Commit().Error; err != nil {
 		return err
 	}
