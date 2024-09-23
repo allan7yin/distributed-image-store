@@ -6,7 +6,7 @@ import (
 )
 
 type Base struct {
-	ID              uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
-	DateTimeCreated time.Time `gorm:"autoCreateTime"`
-	DateTimeUpdated time.Time `gorm:"autoUpdateTime"`
+	Id              uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
+	dateTimeCreated time.Time `gorm:"autoCreateTime"`
+	dateTimeUpdated time.Time `gorm:"autoUpdateTime"`
 }

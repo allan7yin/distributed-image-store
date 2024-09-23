@@ -22,9 +22,9 @@
 │   │   ├── exceptions
 │   │   │   ├── storage_errors.go  # Custom storage exceptions
 │   └── transport
-│       ├── controllers
-│       │   ├── base_controller.go # Base controller (BaseController.java)
-│       │   └── user_controller.go # User controller (UserController.java)
+│       ├── handlers
+│       │   ├── base_handler.go # Base controller (BaseController.java)
+│       │   └── user_handler.go # User controller (UserController.java)
 │       ├── auth
 │       │   └── auth_middleware.go # Authentication handling
 ├── internal
