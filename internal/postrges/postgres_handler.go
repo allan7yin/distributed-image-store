@@ -1,4 +1,4 @@
-package internal
+package postrges
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// ConnectionHandler manages the database connection pool
 type ConnectionHandler struct {
 	DB   *gorm.DB
 	Pool *pgxpool.Pool

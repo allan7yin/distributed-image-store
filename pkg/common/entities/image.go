@@ -20,12 +20,12 @@ func (image Image) mapToFileID(fileIDPrefix string) string {
 	return fmt.Sprintf(fileIDPrefix, image.Base.Id, image.Base.Id)
 }
 
-// Example usage in the imageToFileMapper function
-func (image Image) imageToFileMapper() common.File {
-	file := common.File{
-		Id:   image.mapToFileID(fileIDPrefix), // Now calling the method on the struct
-		Hash: image.imageMetaData.Hash,
-	}
-
-	return file
-}
+//// Example usage in the imageToFileMapper function
+//func (image Image) imageToFileMapper() common.File {
+//	file := common.File{
+//		Id:   image.mapToFileID(fileIDPrefix), // Now calling the method on the struct
+//		Hash: image.imageMetaData.Hash,
+//	}
+//
+//	return file
+//}
