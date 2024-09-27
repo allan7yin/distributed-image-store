@@ -4,6 +4,7 @@ import (
 	"bit-image/internal/s3"
 	"fmt"
 	"github.com/google/uuid"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -36,7 +37,8 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 		return nil, fmt.Errorf("s3 handler not set")
 	}
 
-	numWorkers := min(NumImages, 20)
+	numCores := runtime.NumCPU()
+	numWorkers := min(NumImages, numCores)
 
 	urls := make(chan PresignedURL, NumImages)
 	errors := make(chan error, NumImages)
@@ -90,3 +92,16 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 
 	return presignedURLs, nil
 }
+
+// next step -> do ConfirmImagesUploaded
+/*
+Rundown:
+Request body will include:
+- image id
+- name
+- hash
+- is_private (determines if the s3 object is public or not)
+- tags -> tags for the image the user has assigned
+*/
+
+func ConfirmImagesUploaded()
