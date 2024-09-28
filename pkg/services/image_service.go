@@ -2,6 +2,8 @@ package services
 
 import (
 	"bit-image/internal/s3"
+	"bit-image/pkg/common"
+	"bit-image/pkg/common/entities"
 	"fmt"
 	"github.com/google/uuid"
 	"runtime"
@@ -28,6 +30,13 @@ type PresignedURL struct {
 	ImageId uuid.UUID `json:"image_id"`
 }
 
+type ConfirmUploadRequest struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	Hash      string `json:"hash"`
+	IsPrivate bool   `json:"is_private"`
+}
+
 func NewImageService(s3Handler *s3.Handler) *ImageService {
 	return &ImageService{S3Handler: s3Handler}
 }
@@ -36,7 +45,6 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 	if svc == nil {
 		return nil, fmt.Errorf("s3 handler not set")
 	}
-
 	numCores := runtime.NumCPU()
 	numWorkers := min(NumImages, numCores)
 
@@ -51,7 +59,7 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for range tasks { // Each worker picks up tasks from the 'tasks' channel
+			for range tasks {
 				url, imageId, err := svc.S3Handler.GeneratePresignedURL(15 * time.Minute)
 				if err != nil {
 					errors <- err
@@ -59,33 +67,29 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 				}
 				urls <- PresignedURL{
 					URL:     url,
-					Method:  "PUT", // Assuming PUT for uploads
+					Method:  "PUT",
 					ImageId: imageId,
 				}
 			}
 		}()
 	}
 
-	// Send tasks to workers
 	for i := 0; i < NumImages; i++ {
 		tasks <- struct{}{}
 	}
-	close(tasks) // Close the tasks channel after sending all tasks
+	close(tasks)
 
-	// Wait for all workers to finish and then close the urls channel
 	go func() {
 		wg.Wait()
 		close(urls)
 		close(errors)
 	}()
 
-	// Collect presigned URLs
 	var presignedURLs []PresignedURL
 	for url := range urls {
 		presignedURLs = append(presignedURLs, url)
 	}
 
-	// Handle errors
 	if len(errors) > 0 {
 		return nil, fmt.Errorf("failed to generate some presigned URLs")
 	}
@@ -102,6 +106,34 @@ Request body will include:
 - hash
 - is_private (determines if the s3 object is public or not)
 - tags -> tags for the image the user has assigned
+
+
+steps:
+- move image in s3 to a "TEMP_HOME" folder
+- then, retrieve the metadata for that image -> size, type, etc.
+- then, insert this into Image entity and insert into database
 */
 
-func ConfirmImagesUploaded()
+func (svc *ImageService) MoveToFolder(ImageId int) ([]PresignedURL, error) {}
+
+func (svc *ImageService) CreateImage(req ConfirmUploadRequest) {
+	// construct the Image entity from the request
+	ImageId, err := uuid.Parse(req.Id)
+	if err != nil {
+		fmt.Println("Invalid UUID string:", err)
+		return
+	}
+
+	// need to first retreiev the other image data
+
+	NewImage := entities.Image{
+		Base: common.Base{
+			Id: ImageId,
+		},
+		Name:      req.Name,
+		IsPrivate: req.IsPrivate,
+		ImageMetaData: common.ImageMetaData{
+			Hash: req.Hash,
+		}
+	}
+}

@@ -20,11 +20,11 @@ func main() {
 	}
 
 	// Postgres Initialization
-	//handler, err = postrges.NewConnectionHandler()
-	//if err != nil {
-	//	log.Fatalf("Error initializing database connection: %v", err)
-	//}
-	//defer handler.Close() // Ensure the connection pool is closed when the app shuts down
+	handler, err = postrges.NewConnectionHandler()
+	if err != nil {
+		log.Fatalf("Error initializing database connection: %v", err)
+	}
+	defer handler.Close()
 
 	// Create a new Gin router
 	router := gin.Default()
@@ -37,13 +37,12 @@ func main() {
 	})
 
 	// Example route that uses the database connection
-	//router.GET("/db-stats", func(c *gin.Context) {
-	//	// Print connection pool stats
-	//	handler.PrintConnectionPoolStats()
-	//	c.JSON(http.StatusOK, gin.H{
-	//		"message": "Database stats printed",
-	//	})
-	//})
+	router.GET("/db-stats", func(c *gin.Context) {
+		handler.PrintConnectionPoolStats()
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Database stats printed",
+		})
+	})
 
 	imageService, err := wire.WireApp()
 	if err != nil {
