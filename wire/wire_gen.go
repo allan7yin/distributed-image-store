@@ -19,7 +19,8 @@ func WireApp() (*services.ImageService, error) {
 	if err != nil {
 		return nil, err
 	}
-	handler := s3.NewS3Handler(client)
+	s3FileSystem := s3.NewS3FileSystem(client)
+	handler := s3.NewHandler(s3FileSystem)
 	imageService := services.NewImageService(handler)
 	return imageService, nil
 }
