@@ -3,6 +3,8 @@ package services
 import (
 	"bit-image/internal/s3"
 	"bit-image/pkg/common"
+	"bit-image/pkg/common/entities"
+	"bit-image/pkg/storage/image"
 	"fmt"
 	"github.com/google/uuid"
 	"os"
@@ -12,7 +14,8 @@ import (
 )
 
 type ImageService struct {
-	S3Handler *s3.Handler
+	S3Handler  *s3.Handler
+	ImageStore *image.ImageStore
 }
 
 type PresignedURL struct {
@@ -28,8 +31,11 @@ type ConfirmUploadRequest struct {
 	IsPrivate bool   `json:"is_private"`
 }
 
-func NewImageService(s3Handler *s3.Handler) *ImageService {
-	return &ImageService{S3Handler: s3Handler}
+func NewImageService(store *image.ImageStore, s3Handler *s3.Handler) *ImageService {
+	return &ImageService{
+		ImageStore: store,
+		S3Handler:  s3Handler,
+	}
 }
 
 func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, error) {
@@ -88,22 +94,6 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 	return presignedURLs, nil
 }
 
-// next step -> do ConfirmImagesUploaded
-/*
-Rundown:
-Request body will include:
-- image id
-- name
-- hash
-- is_private (determines if the s3 object is public or not)
-- tags -> tags for the image the user has assigned
-
-
-steps:
-- move image in s3 to a "TEMP_HOME" folder
-- then, retrieve the metadata for that image -> size, type, etc.
-- then, insert this into Image entity and insert into database
-*/
 func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadRequest) {
 	var wg sync.WaitGroup
 	for _, uploadRequest := range uploadRequests {
@@ -143,17 +133,18 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 
 	fmt.Printf("Image with ID %s successfully moved to permanent storage folder.\n", file.Id)
 
-	// Placeholder for creating a new Image entity
-	// NewImage := entities.Image{
-	//	Base: common.Base{
-	//		Id: ImageId,
-	//	},
-	//	Name:      req.Name,
-	//	IsPrivate: req.IsPrivate,
-	//	ImageMetaData: common.ImageMetaData{
-	//		Hash: req.Hash,
-	//	}
-	// }
+	//Placeholder for creating a new Image entity
+	NewImage := entities.Image{
+		Base: common.Base{
+			Id: ImageId,
+		},
+		Name:      uploadRequest.Name,
+		IsPrivate: uploadRequest.IsPrivate,
+		ImageMetaData: common.ImageMetaData{
+			Hash: uploadRequest.Hash,
+		},
+	}
 
+	fmt.Println(NewImage)
 	return nil
 }

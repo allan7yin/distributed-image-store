@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bit-image/pkg/services"
+	"bit-image/pkg/storage"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -21,6 +22,7 @@ type PresignedURLResponse struct {
 
 type ImageHandler struct {
 	ImageService *services.ImageService
+	ImageStore   *storage.UserStore
 }
 
 func NewImageHandler(imageService *services.ImageService) *ImageHandler {

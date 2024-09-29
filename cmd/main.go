@@ -2,7 +2,6 @@ package main
 
 import (
 	"bit-image/internal/postrges"
-	"bit-image/pkg/handlers"
 	"bit-image/wire"
 	"log"
 	"net/http"
@@ -44,12 +43,11 @@ func main() {
 		})
 	})
 
-	imageService, err := wire.WireApp()
+	imageHandler, err := wire.InitializeImageHandler()
 	if err != nil {
 		log.Fatalf("Failed to initialize the app: %v", err)
 	}
 
-	imageHandler := handlers.NewImageHandler(imageService)
 	router.PUT("/generateUploadUrls", imageHandler.GeneratePresignedURL())
 	router.POST("/confirmImageUploads", imageHandler.ConfirmImageUploads())
 
