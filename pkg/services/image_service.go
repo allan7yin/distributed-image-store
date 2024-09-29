@@ -120,13 +120,13 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 	}
 
 	// Obtain the metadata
-	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(ImageId.String(), os.Getenv("DEFAULT_BUCKET_NAME"))
+	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(common.TEMPORARY_STORAGE_FOLDER+"/"+ImageId.String(), os.Getenv("DEFAULT_BUCKET_NAME"))
 	if err != nil {
 		return fmt.Errorf("failed to get metadata for image with ID %s: %w", ImageId.String(), err)
 	}
 	fmt.Printf("Image metadata retrieved - Size: %d bytes, Content-Type: %s\n", imageSize, contentType)
 
-	err = svc.S3Handler.MoveFileToFolder(file, os.Getenv("DEFAULT_BUCKET_NAME"), common.PERMANENT_STORAGE_FOLDER)
+	err = svc.S3Handler.MoveFileToFolder(file, common.TEMPORARY_STORAGE_FOLDER, common.PERMANENT_STORAGE_FOLDER)
 	if err != nil {
 		return fmt.Errorf("failed to move file with ID %s to folder %s: %w", file.Id, common.PERMANENT_STORAGE_FOLDER, err)
 	}

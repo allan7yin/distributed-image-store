@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -82,7 +83,7 @@ func (fs *S3FileSystem) GeneratePresignedURL(expiry time.Duration) (string, uuid
 
 	putObjectInput := &s3.PutObjectInput{
 		Bucket: aws.String(defaultBucketName),
-		Key:    aws.String(imageIdString),
+		Key:    aws.String(common.TEMPORARY_STORAGE_FOLDER + "/" + imageIdString),
 	}
 
 	presignedURL, err := presigner.PresignPutObject(context.TODO(), putObjectInput, s3.WithPresignExpires(expiry))
@@ -99,17 +100,30 @@ func (fs *S3FileSystem) MoveFileToFolder(file common.File, srcFolderName, destFo
 	destKey := fmt.Sprintf("%s/%s", destFolderName, file.Id)
 	bucket := os.Getenv("DEFAULT_BUCKET_NAME")
 
+	if bucket == "" {
+		return fmt.Errorf("environment variable DEFAULT_BUCKET_NAME is not set")
+	}
+
 	ctx := context.TODO()
 
-	found, _ := fs.fileExists(bucket, destKey)
+	// Step 0: Check if the destination file already exists
+	found, err := fs.fileExists(bucket, destKey)
+	if err == nil {
+		fmt.Println(err)
+		return fmt.Errorf("failed to check if destination file exists: %w", err)
+	}
+
 	if found {
-		return fmt.Errorf("Cannot move file to " + destFolderName + ". Already exists object with id: " + file.Id)
+		return fmt.Errorf("cannot move file to %s. Object with id %s already exists", destFolderName, file.Id)
 	}
 
 	// Step 1: Copy the object to the new location
-	_, err := fs.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
+	copySource := fmt.Sprintf("%s/%s", bucket, srcKey)
+	copySource = url.PathEscape(copySource) // Ensure proper URL encoding
+
+	_, err = fs.s3Client.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(bucket),
-		CopySource: aws.String(bucket + "/" + srcKey), // Source should be in the format "bucket/key"
+		CopySource: aws.String(copySource),
 		Key:        aws.String(destKey),
 		ACL:        types.ObjectCannedACLPrivate, // Or other ACL as needed
 	})
