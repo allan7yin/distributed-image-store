@@ -51,6 +51,7 @@ func main() {
 
 	imageHandler := handlers.NewImageHandler(imageService)
 	router.PUT("/generateUploadUrls", imageHandler.GeneratePresignedURL())
+	router.POST("/confirmImageUploads", imageHandler.ConfirmImageUploads())
 
 	// Start the server
 	if err := router.Run(); err != nil {

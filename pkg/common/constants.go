@@ -1,1 +1,6 @@
-package constants
+package common
+
+const (
+	TEMPORARY_STORAGE_FOLDER = "/"
+	PERMANENT_STORAGE_FOLDER = "PERMANENT_STORAGE_FOLDER"
+)

@@ -12,14 +12,7 @@ type PresignedURLRequest struct {
 }
 
 type ConfirmUploadsRequest struct {
-	ImageUploads []ConfirmUploadRequest `json:"image_uploads"`
-}
-
-type ConfirmUploadRequest struct {
-	Id        string `json:"id"`
-	Name      string `json:"name"`
-	Hash      string `json:"hash"`
-	IsPrivate bool   `json:"is_private"`
+	ImageUploads []services.ConfirmUploadRequest `json:"image_uploads"`
 }
 
 type PresignedURLResponse struct {
@@ -66,17 +59,7 @@ func (h *ImageHandler) GeneratePresignedURL() gin.HandlerFunc {
 	}
 }
 
-// next step -> do ConfirmImagesUploaded
-/*
-Rundown:
-Request body will include:
-- image id
-- name
-- hash
-- is_private (determines if the s3 object is public or not)
-- tags -> tags for the image the user has assigned
-*/
-func (h *ImageHandler) ConfirmUploadImage() gin.HandlerFunc {
+func (h *ImageHandler) ConfirmImageUploads() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request ConfirmUploadsRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
@@ -84,7 +67,8 @@ func (h *ImageHandler) ConfirmUploadImage() gin.HandlerFunc {
 			return
 		}
 
-		// now, we will take this and create an Image
-		h.ImageService.
+		h.ImageService.ConfirmImageUploads(request.ImageUploads)
+
+		c.JSON(http.StatusOK, gin.H{"message": "All Image Uploads confirmed successfully"})
 	}
 }

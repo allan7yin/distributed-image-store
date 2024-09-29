@@ -1,35 +1,37 @@
 package s3
 
 import (
-	"context"
-	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"bit-image/pkg/common"
+	"bit-image/pkg/storage"
 	"github.com/google/uuid"
-	"os"
 	"time"
 )
 
 type Handler struct {
-	Client *s3.Client
+	FileSystem *storage.S3FileSystem
 }
 
 func (handler *Handler) GeneratePresignedURL(expiry time.Duration) (string, uuid.UUID, error) {
-	presigner := s3.NewPresignClient(handler.Client)
-
-	imageId := uuid.New()
-	imageIdString := imageId.String()
-	defaultBucketName := os.Getenv("DEFAULT_BUCKET_NAME")
-
-	putObjectInput := &s3.PutObjectInput{
-		Bucket: aws.String(defaultBucketName),
-		Key:    aws.String(imageIdString),
-	}
-
-	presignedURL, err := presigner.PresignPutObject(context.TODO(), putObjectInput, s3.WithPresignExpires(expiry))
+	// Delegate to FileSystem's GeneratePresignedURL method
+	presignedURL, imageId, err := handler.FileSystem.GeneratePresignedURL(expiry)
 	if err != nil {
-		return "", uuid.UUID{}, fmt.Errorf("error presigning request: %w", err)
+		return "", uuid.UUID{}, err
 	}
+	return presignedURL, imageId, nil
+}
 
-	return presignedURL.URL, imageId, nil
+func (handler *Handler) MoveFileToFolder(file common.File, src, dest string) error {
+	err := handler.FileSystem.MoveFileToFolder(file, src, dest)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (handler *Handler) GetImageMetaData(imageId, bucket string) (int64, string, error) {
+	imageSize, contentType, err := handler.FileSystem.GetObjectMetadata(imageId, bucket)
+	if err != nil {
+		return 0, "", err // make this better later
+	}
+	return imageSize, contentType, nil
 }

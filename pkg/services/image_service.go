@@ -3,22 +3,13 @@ package services
 import (
 	"bit-image/internal/s3"
 	"bit-image/pkg/common"
-	"bit-image/pkg/common/entities"
 	"fmt"
 	"github.com/google/uuid"
+	"os"
 	"runtime"
 	"sync"
 	"time"
 )
-
-/*
-type ImageUploadService interface {
-	GenerateImageUploadUrls(count int, userID string) ([]string, error)
-	//ConfirmImagesUploaded(cmds[]) ([]entities.Image, error)
-	//GetImage(userID, imageID string) (Image, error)
-	//GetAllPublicImages() ([]Image, error)
-}
-*/
 
 type ImageService struct {
 	S3Handler *s3.Handler
@@ -113,27 +104,56 @@ steps:
 - then, retrieve the metadata for that image -> size, type, etc.
 - then, insert this into Image entity and insert into database
 */
+func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadRequest) {
+	var wg sync.WaitGroup
+	for _, uploadRequest := range uploadRequests {
+		wg.Add(1)
+		go func(uploadRequest ConfirmUploadRequest) {
+			defer wg.Done()
+			svc.ConfirmImage(uploadRequest)
+		}(uploadRequest)
+	}
 
-func (svc *ImageService) MoveToFolder(ImageId int) ([]PresignedURL, error) {}
+	wg.Wait()
+}
 
-func (svc *ImageService) CreateImage(req ConfirmUploadRequest) {
-	// construct the Image entity from the request
-	ImageId, err := uuid.Parse(req.Id)
+func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error {
+	// Parse UUID from the request
+	ImageId, err := uuid.Parse(uploadRequest.Id)
 	if err != nil {
-		fmt.Println("Invalid UUID string:", err)
-		return
+		return fmt.Errorf("failed to parse UUID from request ID %s: %w", uploadRequest.Id, err)
 	}
 
-	// need to first retreiev the other image data
-
-	NewImage := entities.Image{
-		Base: common.Base{
-			Id: ImageId,
-		},
-		Name:      req.Name,
-		IsPrivate: req.IsPrivate,
-		ImageMetaData: common.ImageMetaData{
-			Hash: req.Hash,
-		}
+	file := common.File{
+		Id:   ImageId.String(),
+		Hash: uploadRequest.Hash,
 	}
+
+	// Obtain the metadata
+	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(ImageId.String(), os.Getenv("DEFAULT_BUCKET_NAME"))
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for image with ID %s: %w", ImageId.String(), err)
+	}
+	fmt.Printf("Image metadata retrieved - Size: %d bytes, Content-Type: %s\n", imageSize, contentType)
+
+	err = svc.S3Handler.MoveFileToFolder(file, os.Getenv("DEFAULT_BUCKET_NAME"), common.PERMANENT_STORAGE_FOLDER)
+	if err != nil {
+		return fmt.Errorf("failed to move file with ID %s to folder %s: %w", file.Id, common.PERMANENT_STORAGE_FOLDER, err)
+	}
+
+	fmt.Printf("Image with ID %s successfully moved to permanent storage folder.\n", file.Id)
+
+	// Placeholder for creating a new Image entity
+	// NewImage := entities.Image{
+	//	Base: common.Base{
+	//		Id: ImageId,
+	//	},
+	//	Name:      req.Name,
+	//	IsPrivate: req.IsPrivate,
+	//	ImageMetaData: common.ImageMetaData{
+	//		Hash: req.Hash,
+	//	}
+	// }
+
+	return nil
 }
