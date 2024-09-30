@@ -126,20 +126,13 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 	}
 	fmt.Printf("Image metadata retrieved - Size: %d bytes, Content-Type: %s\n", imageSize, contentType)
 
-	err = svc.S3Handler.MoveFileToFolder(file, common.TEMPORARY_STORAGE_FOLDER, common.PERMANENT_STORAGE_FOLDER)
-	if err != nil {
-		return fmt.Errorf("failed to move file with ID %s to folder %s: %w", file.Id, common.PERMANENT_STORAGE_FOLDER, err)
-	}
-
-	fmt.Printf("Image with ID %s successfully moved to permanent storage folder.\n", file.Id)
-
-	//Placeholder for creating a new Image entity
 	NewImage := entities.Image{
 		Base: common.Base{
 			Id: ImageId,
 		},
 		Name:      uploadRequest.Name,
 		IsPrivate: uploadRequest.IsPrivate,
+		Path:      common.PERMANENT_STORAGE_FOLDER + "/" + ImageId.String(),
 		ImageMetaData: common.ImageMetaData{
 			Hash:     uploadRequest.Hash,
 			FileSize: float64(imageSize),
@@ -147,11 +140,19 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 		},
 	}
 
-	// TODO: need transactional roll back here, if fails, do not move the image to new folder
 	err = svc.ImageStore.AddImage(NewImage)
 	if err != nil {
 		fmt.Println(err)
+
 		return err
+	} else {
+		err = svc.S3Handler.MoveFileToFolder(file, common.TEMPORARY_STORAGE_FOLDER, common.PERMANENT_STORAGE_FOLDER)
+		if err != nil {
+			return fmt.Errorf("failed to move file with ID %s to folder %s: %w", file.Id, common.PERMANENT_STORAGE_FOLDER, err)
+		}
+
+		fmt.Printf("Image with ID %s successfully moved to permanent storage folder.\n", file.Id)
 	}
+
 	return nil
 }

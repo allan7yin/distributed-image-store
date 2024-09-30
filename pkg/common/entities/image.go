@@ -7,5 +7,6 @@ type Image struct {
 	Base          common.Base          `gorm:"embedded;not null"`
 	Name          string               `gorm:"not null"`
 	IsPrivate     bool                 `gorm:"not null"`
+	Path          string               `gorm:"not null"`
 	ImageMetaData common.ImageMetaData `gorm:"embedded;not null"`
 }
