@@ -141,10 +141,17 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 		Name:      uploadRequest.Name,
 		IsPrivate: uploadRequest.IsPrivate,
 		ImageMetaData: common.ImageMetaData{
-			Hash: uploadRequest.Hash,
+			Hash:     uploadRequest.Hash,
+			FileSize: float64(imageSize),
+			Format:   contentType,
 		},
 	}
 
-	fmt.Println(NewImage)
+	// TODO: need transactional roll back here, if fails, do not move the image to new folder
+	err = svc.ImageStore.AddImage(NewImage)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 	return nil
 }

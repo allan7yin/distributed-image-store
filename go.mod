@@ -13,7 +13,7 @@ require (
 	github.com/google/wire v0.6.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/joho/godotenv v1.5.1
-	gorm.io/driver/postgres v1.5.9
+	gorm.io/driver/postgres v1.4.0
 	gorm.io/gorm v1.25.12
 )
 

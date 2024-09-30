@@ -1,6 +1,7 @@
 package postrges
 
 import (
+	"bit-image/pkg/common/entities"
 	"context"
 	"fmt"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -53,6 +54,12 @@ func NewConnectionHandler() (*ConnectionHandler, error) {
 	if err != nil {
 		log.Fatalf("Error setting up GORM: %v", err)
 		return nil, err
+	}
+
+	//ensure tables are created
+	err = gormDB.AutoMigrate(&entities.Image{})
+	if err != nil {
+		log.Fatalf("Error setting up tables in GORM: %v", err)
 	}
 
 	return &ConnectionHandler{
