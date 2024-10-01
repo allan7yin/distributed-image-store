@@ -69,8 +69,21 @@ func (h *ImageHandler) ConfirmImageUploads() gin.HandlerFunc {
 			return
 		}
 
-		h.ImageService.ConfirmImageUploads(request.ImageUploads)
+		errors := h.ImageService.ConfirmImageUploads(request.ImageUploads)
 
-		c.JSON(http.StatusOK, gin.H{"message": "All Image Uploads confirmed successfully"})
+		if len(errors) > 0 {
+			var errorMessages []string
+			for _, err := range errors {
+				errorMessages = append(errorMessages, err.Error())
+			}
+
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Some image uploads failed to confirm",
+				"errors":  errorMessages,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "All image uploads confirmed successfully"})
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"bit-image/pkg/storage/image"
 	"fmt"
 	"github.com/google/uuid"
+	"log"
 	"os"
 	"runtime"
 	"sync"
@@ -94,45 +95,76 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 	return presignedURLs, nil
 }
 
-func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadRequest) {
+func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadRequest) []error {
+	// idiomatic go -> handle errors with a wait channel
 	var wg sync.WaitGroup
+	errChan := make(chan error, len(uploadRequests))
+
 	for _, uploadRequest := range uploadRequests {
 		wg.Add(1)
 		go func(uploadRequest ConfirmUploadRequest) {
 			defer wg.Done()
-			svc.ConfirmImage(uploadRequest)
+
+			// Call ConfirmImage and send error to channel if any
+			if err := svc.ConfirmImage(uploadRequest); err != nil {
+				errChan <- fmt.Errorf("failed to confirm upload for request ID %s: %w", uploadRequest.Id, err)
+			} else {
+				errChan <- nil
+			}
 		}(uploadRequest)
 	}
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	var errs []error
+	for err := range errChan {
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
 }
 
 func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error {
-	// Parse UUID from the request
-	ImageId, err := uuid.Parse(uploadRequest.Id)
+	imageID, err := uuid.Parse(uploadRequest.Id)
 	if err != nil {
 		return fmt.Errorf("failed to parse UUID from request ID %s: %w", uploadRequest.Id, err)
 	}
 
-	file := common.File{
-		Id:   ImageId.String(),
-		Hash: uploadRequest.Hash,
-	}
-
-	// Obtain the metadata
-	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(common.TEMPORARY_STORAGE_FOLDER+"/"+ImageId.String(), os.Getenv("DEFAULT_BUCKET_NAME"))
+	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(common.TEMPORARY_STORAGE_FOLDER+"/"+imageID.String(), os.Getenv("DEFAULT_BUCKET_NAME"))
 	if err != nil {
-		return fmt.Errorf("failed to get metadata for image with ID %s: %w", ImageId.String(), err)
+		return fmt.Errorf("failed to get metadata for image with ID %s: %w", imageID.String(), err)
 	}
 	fmt.Printf("Image metadata retrieved - Size: %d bytes, Content-Type: %s\n", imageSize, contentType)
 
-	NewImage := entities.Image{
+	tx, commit, rollback, err := svc.ImageStore.DBHandler.OpenTransaction()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+
+	file := common.File{
+		Id:   imageID.String(),
+		Hash: uploadRequest.Hash,
+	}
+	if err = svc.S3Handler.MoveFileToFolder(file, common.TEMPORARY_STORAGE_FOLDER, common.PERMANENT_STORAGE_FOLDER); err != nil {
+		return fmt.Errorf("failed to move file with ID %s to folder %s: %w", file.Id, common.PERMANENT_STORAGE_FOLDER, err)
+	}
+	fmt.Printf("Image with ID %s successfully moved to permanent storage folder.\n", file.Id)
+
+	newImage := entities.Image{
 		Base: common.Base{
-			Id: ImageId,
+			Id: imageID,
 		},
 		Name:      uploadRequest.Name,
 		IsPrivate: uploadRequest.IsPrivate,
-		Path:      common.PERMANENT_STORAGE_FOLDER + "/" + ImageId.String(),
+		Path:      common.PERMANENT_STORAGE_FOLDER + "/" + imageID.String(),
 		ImageMetaData: common.ImageMetaData{
 			Hash:     uploadRequest.Hash,
 			FileSize: float64(imageSize),
@@ -140,18 +172,26 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 		},
 	}
 
-	err = svc.ImageStore.AddImage(NewImage)
-	if err != nil {
-		fmt.Println(err)
-
-		return err
-	} else {
-		err = svc.S3Handler.MoveFileToFolder(file, common.TEMPORARY_STORAGE_FOLDER, common.PERMANENT_STORAGE_FOLDER)
-		if err != nil {
-			return fmt.Errorf("failed to move file with ID %s to folder %s: %w", file.Id, common.PERMANENT_STORAGE_FOLDER, err)
+	if err = svc.ImageStore.AddImageWithTransaction(tx, newImage); err != nil {
+		if rollbackErr := rollback(); rollbackErr != nil {
+			log.Printf("failed to rollback transaction: %v", rollbackErr)
 		}
 
-		fmt.Printf("Image with ID %s successfully moved to permanent storage folder.\n", file.Id)
+		if moveBackErr := svc.S3Handler.MoveFileToFolder(file, common.PERMANENT_STORAGE_FOLDER, common.TEMPORARY_STORAGE_FOLDER); moveBackErr != nil {
+			fmt.Printf("Warning: failed to move file back to temporary folder after DB insert failure: %v\n", moveBackErr)
+		}
+		return fmt.Errorf("failed to save image metadata to database: %w", err)
+	}
+
+	if err = commit(); err != nil {
+		if rollbackErr := rollback(); rollbackErr != nil {
+			log.Printf("failed to rollback transaction: %v", rollbackErr)
+		}
+
+		if moveBackErr := svc.S3Handler.MoveFileToFolder(file, common.PERMANENT_STORAGE_FOLDER, common.TEMPORARY_STORAGE_FOLDER); moveBackErr != nil {
+			fmt.Printf("Warning: failed to move file back to temporary folder after commit failure: %v\n", moveBackErr)
+		}
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
