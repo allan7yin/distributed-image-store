@@ -8,3 +8,7 @@
 |   | ||_|| |   _   |   |_| |   |___      _____| | |   | |       |   |  | |   |___ 
 |___|_|   |_|__| |__|_______|_______|    |_______| |___| |_______|___|  |_|_______|
 ```
+
+### Performance
+- TODO: load test bit-image with JMeter
+- Add userId to the object file path

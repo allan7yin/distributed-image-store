@@ -2,6 +2,7 @@ package main
 
 import (
 	"bit-image/internal/postrges"
+	"bit-image/pkg/middleware"
 	"bit-image/wire"
 	"log"
 	"net/http"
@@ -19,23 +20,22 @@ func main() {
 	}
 
 	// Postgres Initialization
-	handler, err = postrges.NewConnectionHandler()
+	handler, err := postrges.NewConnectionHandler()
 	if err != nil {
 		log.Fatalf("Error initializing database connection: %v", err)
 	}
 	defer handler.Close()
 
-	// Create a new Gin router
 	router := gin.Default()
 
-	// Define routes
+	// healthcheck
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
 
-	// Example route that uses the database connection
+	// db healthcheck
 	router.GET("/db-stats", func(c *gin.Context) {
 		handler.PrintConnectionPoolStats()
 		c.JSON(http.StatusOK, gin.H{
@@ -43,13 +43,18 @@ func main() {
 		})
 	})
 
+	// Initialize image handler
 	imageHandler, err := wire.InitializeImageHandler()
 	if err != nil {
 		log.Fatalf("Failed to initialize the app: %v", err)
 	}
 
-	router.PUT("/generateUploadUrls", imageHandler.GeneratePresignedURL())
-	router.POST("/confirmImageUploads", imageHandler.ConfirmImageUploads())
+	// Protected routes using AuthMiddleware
+	apiGroup := router.Group("/api")
+	apiGroup.Use(middleware.AuthMiddleware())
+
+	apiGroup.PUT("/generateUploadUrls", imageHandler.GeneratePresignedURL())
+	apiGroup.POST("/confirmImageUploads", imageHandler.ConfirmImageUploads())
 
 	// Start the server
 	if err := router.Run(); err != nil {
