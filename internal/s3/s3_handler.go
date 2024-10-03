@@ -11,9 +11,9 @@ type Handler struct {
 	FileSystem *storage.S3FileSystem
 }
 
-func (handler *Handler) GeneratePresignedURL(expiry time.Duration) (string, uuid.UUID, error) {
+func (handler *Handler) GeneratePresignedURL(expiry time.Duration, UserId string) (string, uuid.UUID, error) {
 	// Delegate to FileSystem's GeneratePresignedURL method
-	presignedURL, imageId, err := handler.FileSystem.GeneratePresignedURL(expiry)
+	presignedURL, imageId, err := handler.FileSystem.GeneratePresignedURL(expiry, UserId)
 	if err != nil {
 		return "", uuid.UUID{}, err
 	}

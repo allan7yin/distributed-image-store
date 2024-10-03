@@ -42,7 +42,11 @@ func (h *ImageHandler) GeneratePresignedURL() gin.HandlerFunc {
 			return
 		}
 
-		urls, _ := h.ImageService.GeneratePresignedURLs(request.NumImages)
+		userId, exists := c.Get("userId")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "No user found, userId not found"})
+		}
+		urls, _ := h.ImageService.GeneratePresignedURLs(request.NumImages, userId.(string))
 
 		response := PresignedURLResponse{
 			ImageUploadURLs: urls,
@@ -69,7 +73,12 @@ func (h *ImageHandler) ConfirmImageUploads() gin.HandlerFunc {
 			return
 		}
 
-		errors := h.ImageService.ConfirmImageUploads(request.ImageUploads)
+		userId, exists := c.Get("userId")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "No user found, userId not found"})
+		}
+
+		errors := h.ImageService.ConfirmImageUploads(request.ImageUploads, userId.(string))
 
 		if len(errors) > 0 {
 			var errorMessages []string

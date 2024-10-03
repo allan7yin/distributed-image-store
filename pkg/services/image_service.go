@@ -39,7 +39,7 @@ func NewImageService(store *image.ImageStore, s3Handler *s3.Handler) *ImageServi
 	}
 }
 
-func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, error) {
+func (svc *ImageService) GeneratePresignedURLs(NumImages int, UserId string) ([]PresignedURL, error) {
 	if svc == nil {
 		return nil, fmt.Errorf("s3 handler not set")
 	}
@@ -58,7 +58,7 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 		go func() {
 			defer wg.Done()
 			for range tasks {
-				url, imageId, err := svc.S3Handler.GeneratePresignedURL(15 * time.Minute)
+				url, imageId, err := svc.S3Handler.GeneratePresignedURL(15*time.Minute, UserId)
 				if err != nil {
 					errors <- err
 					return
@@ -95,7 +95,7 @@ func (svc *ImageService) GeneratePresignedURLs(NumImages int) ([]PresignedURL, e
 	return presignedURLs, nil
 }
 
-func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadRequest) []error {
+func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadRequest, UserId string) []error {
 	// idiomatic go -> handle errors with a wait channel
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(uploadRequests))
@@ -106,7 +106,7 @@ func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadReque
 			defer wg.Done()
 
 			// Call ConfirmImage and send error to channel if any
-			if err := svc.ConfirmImage(uploadRequest); err != nil {
+			if err := svc.ConfirmImage(uploadRequest, UserId); err != nil {
 				errChan <- fmt.Errorf("failed to confirm upload for request ID %s: %w", uploadRequest.Id, err)
 			} else {
 				errChan <- nil
@@ -132,13 +132,16 @@ func (svc *ImageService) ConfirmImageUploads(uploadRequests []ConfirmUploadReque
 	return nil
 }
 
-func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error {
+func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest, UserId string) error {
 	imageID, err := uuid.Parse(uploadRequest.Id)
 	if err != nil {
 		return fmt.Errorf("failed to parse UUID from request ID %s: %w", uploadRequest.Id, err)
 	}
 
-	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(common.TEMPORARY_STORAGE_FOLDER+"/"+imageID.String(), os.Getenv("DEFAULT_BUCKET_NAME"))
+	userKey := UserId + "/" + imageID.String()
+	path := common.TEMPORARY_STORAGE_FOLDER + "/" + userKey
+	fmt.Println("Constructed Key:", path)
+	imageSize, contentType, err := svc.S3Handler.GetImageMetaData(path, os.Getenv("DEFAULT_BUCKET_NAME"))
 	if err != nil {
 		return fmt.Errorf("failed to get metadata for image with ID %s: %w", imageID.String(), err)
 	}
@@ -150,7 +153,7 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 	}
 
 	file := common.File{
-		Id:   imageID.String(),
+		Id:   userKey,
 		Hash: uploadRequest.Hash,
 	}
 	if err = svc.S3Handler.MoveFileToFolder(file, common.TEMPORARY_STORAGE_FOLDER, common.PERMANENT_STORAGE_FOLDER); err != nil {
@@ -164,7 +167,7 @@ func (svc *ImageService) ConfirmImage(uploadRequest ConfirmUploadRequest) error 
 		},
 		Name:      uploadRequest.Name,
 		IsPrivate: uploadRequest.IsPrivate,
-		Path:      common.PERMANENT_STORAGE_FOLDER + "/" + imageID.String(),
+		Path:      path,
 		ImageMetaData: common.ImageMetaData{
 			Hash:     uploadRequest.Hash,
 			FileSize: float64(imageSize),

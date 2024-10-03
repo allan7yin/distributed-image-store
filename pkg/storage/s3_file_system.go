@@ -74,11 +74,11 @@ func (fs *S3FileSystem) fileExists(bucketName string, destKey string) (bool, err
 	return true, nil
 }
 
-func (fs *S3FileSystem) GeneratePresignedURL(expiry time.Duration) (string, uuid.UUID, error) {
+func (fs *S3FileSystem) GeneratePresignedURL(expiry time.Duration, UserId string) (string, uuid.UUID, error) {
 	presigner := s3.NewPresignClient(fs.s3Client)
 
 	imageId := uuid.New()
-	imageIdString := imageId.String()
+	imageIdString := UserId + "/" + imageId.String()
 	defaultBucketName := os.Getenv("DEFAULT_BUCKET_NAME")
 
 	putObjectInput := &s3.PutObjectInput{
