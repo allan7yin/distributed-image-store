@@ -11,4 +11,6 @@
 
 ### Performance
 - TODO: load test bit-image with JMeter
+- TODO: change from rest to grpc stubs 
+- Hook up AWS sagemaker for image tag generation
 - Add userId to the object file path
